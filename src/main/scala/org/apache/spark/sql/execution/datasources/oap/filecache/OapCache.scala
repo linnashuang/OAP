@@ -18,8 +18,8 @@
 package org.apache.spark.sql.execution.datasources.oap.filecache
 
 import java.io.File
-import java.util.concurrent.{ConcurrentHashMap, LinkedBlockingQueue}
-import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.{ConcurrentHashMap, Executors, LinkedBlockingQueue}
+import java.util.concurrent.atomic.{AtomicInteger, AtomicLong}
 import java.util.concurrent.locks.{Condition, ReentrantLock}
 
 import scala.collection.JavaConverters._
@@ -35,13 +35,89 @@ import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.unsafe.VMEMCacheJNI
 import org.apache.spark.util.Utils
 
+private[filecache] class MultiThreadCacheGuardian(maxMemory: Long) extends CacheGuardian(maxMemory)
+  with Logging {
+
+  // pendingFiberSize and pendingFiberCapacity are different. pendingFiberSize used to
+  // show the pending size to user, however pendingFiberCapacity is used to record the
+  // actual used memory and log warn when exceed the maxMemory.
+  private val freeThreadNum = if (SparkEnv.get != null) {
+    SparkEnv.get.conf.get(OapConf.OAP_CACHE_GUARDIAN_FREE_THREAD_NUM)
+  } else {
+    OapConf.OAP_CACHE_GUARDIAN_FREE_THREAD_NUM.defaultValue.get
+  }
+  private val removalPendingQueues =
+    new Array[LinkedBlockingQueue[(FiberId, FiberCache)]](freeThreadNum)
+  for ( i <- 0 until freeThreadNum)
+    removalPendingQueues(i) = new LinkedBlockingQueue[(FiberId, FiberCache)]()
+  val roundRobin = new AtomicInteger(0)
+
+  override def pendingFiberCount: Int = {
+    var sum = 0
+    removalPendingQueues.foreach(sum += _.size())
+    sum
+  }
+
+  override def addRemovalFiber(fiber: FiberId, fiberCache: FiberCache): Unit = {
+    _pendingFiberSize.addAndGet(fiberCache.size())
+    // Record the occupied size
+    _pendingFiberCapacity.addAndGet(fiberCache.getOccupiedSize())
+    removalPendingQueues(roundRobin.addAndGet(1) % freeThreadNum)
+      .offer((fiber, fiberCache))
+    if (_pendingFiberCapacity.get() > maxMemory) {
+      // TODO:change back logWarning
+      logDebug("Fibers pending on removal use too much memory, " +
+        s"current: ${_pendingFiberCapacity.get()}, max: $maxMemory")
+    }
+  }
+
+  lazy val freeThreadPool = Executors.newFixedThreadPool(freeThreadNum)
+
+
+  override def start(): Unit = {
+    for (i <- 0 until freeThreadNum)
+      freeThreadPool.execute(new freeThread(i))
+
+    class freeThread(id: Int) extends Runnable {
+      override def run(): Unit = {
+        val queue = removalPendingQueues(id)
+        while (true) {
+          val fiberCache = queue.take()._2
+          releaseFiberCache(fiberCache)
+        }
+      }
+    }
+  }
+
+  private def releaseFiberCache(cache: FiberCache): Unit = {
+    val fiberId = cache.fiberId
+    logDebug(s"Removing fiber: $fiberId")
+    // Block if fiber is in use.
+    if (!cache.tryDispose()) {
+      logDebug(s"Waiting fiber to be released timeout. Fiber: $fiberId")
+      removalPendingQueues(roundRobin.addAndGet(1) % freeThreadNum)
+        .offer((fiberId, cache))
+      if (_pendingFiberCapacity.get() > maxMemory) {
+        // TODO:change back
+        logDebug("Fibers pending on removal use too much memory, " +
+          s"current: ${_pendingFiberCapacity.get()}, max: $maxMemory")
+      }
+    } else {
+      _pendingFiberSize.addAndGet(-cache.size())
+      _pendingFiberCapacity.addAndGet(-cache.getOccupiedSize())
+      // TODO: Make log more readable
+      logDebug(s"Fiber removed successfully. Fiber: $fiberId")
+    }
+  }
+}
+
 private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logging {
 
   // pendingFiberSize and pendingFiberCapacity are different. pendingFiberSize used to
   // show the pending size to user, however pendingFiberCapacity is used to record the
   // actual used memory and log warn when exceed the maxMemory.
-  private val _pendingFiberSize: AtomicLong = new AtomicLong(0)
-  private val _pendingFiberCapacity: AtomicLong = new AtomicLong(0)
+  protected val _pendingFiberSize: AtomicLong = new AtomicLong(0)
+  protected val _pendingFiberCapacity: AtomicLong = new AtomicLong(0)
 
   private val removalPendingQueue = new LinkedBlockingQueue[(FiberId, FiberCache)]()
 
@@ -188,7 +264,7 @@ class NonEvictPMCache(dramSize: Long,
                       pmSize: Long,
                       cacheGuardianMemory: Long) extends OapCache with Logging {
   // We don't bother the memory use of Simple Cache
-  private val cacheGuardian = new CacheGuardian(Int.MaxValue)
+  private val cacheGuardian = new MultiThreadCacheGuardian(Int.MaxValue)
   private val _cacheSize: AtomicLong = new AtomicLong(0)
   private val _cacheCount: AtomicLong = new AtomicLong(0)
   private val cacheHitCount: AtomicLong = new AtomicLong(0)
@@ -313,7 +389,7 @@ class VMemCache extends OapCache with Logging {
   private var cacheEvictCount: Long = 0
   private var cacheTotalSize: Long = 0
   // We don't bother the memory use of Simple Cache
-  private val cacheGuardian = new CacheGuardian(Int.MaxValue)
+  private val cacheGuardian = new MultiThreadCacheGuardian(Int.MaxValue)
   cacheGuardian.start()
 
   @volatile private var initialized = false
