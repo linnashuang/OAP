@@ -28,8 +28,14 @@ import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.utils.PersistentMemoryConfigUtils
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.storage.{BlockManager, TestBlockId}
-import org.apache.spark.unsafe.{PersistentMemoryPlatform, Platform}
+import org.apache.spark.unsafe.{PersistentMemoryPlatform, Platform, VMEMCacheJNI}
 import org.apache.spark.util.Utils
+
+
+object CacheEnum extends Enumeration {
+  type CacheEnum = Value
+  val INDEX, DATA, GENERAL = Value
+}
 
 /**
  * A memory block holder which contains the base object, offset, length and occupiedSize. For DRAM
@@ -41,10 +47,12 @@ import org.apache.spark.util.Utils
  * @param occupiedSize the actual occupied size of the memory block
  */
 case class MemoryBlockHolder(
+    var cacheType: CacheEnum.CacheEnum,
     baseObject: AnyRef,
     baseOffset: Long,
     length: Long,
-    occupiedSize: Long)
+    occupiedSize: Long,
+    source: String)
 
 private[sql] abstract class MemoryManager {
   /**
@@ -95,6 +103,7 @@ private[sql] object MemoryManager {
     memoryManagerOpt match {
       case "offheap" => new OffHeapMemoryManager(sparkEnv)
       case "pm" => new PersistentMemoryManager(sparkEnv)
+      case "self" => new SelfManagedMemoryManager(sparkEnv)
       case _ => throw new UnsupportedOperationException(
         s"The memory manager: ${memoryManagerOpt} is not supported now")
     }
@@ -144,7 +153,7 @@ private[filecache] class OffHeapMemoryManager(sparkEnv: SparkEnv)
     logDebug(s"request allocate $size memory, actual occupied size: " +
       s"${size}, used: $memoryUsed")
     // For OFF_HEAP, occupied size also equal to the size.
-    MemoryBlockHolder(null, address, size, size)
+    MemoryBlockHolder(CacheEnum.GENERAL, null, address, size, size, "DRAM")
   }
 
   override private[filecache] def free(block: MemoryBlockHolder): Unit = {
@@ -156,6 +165,50 @@ private[filecache] class OffHeapMemoryManager(sparkEnv: SparkEnv)
 
   override def stop(): Unit = {
     memoryManager.releaseStorageMemory(oapMemory, MemoryMode.OFF_HEAP)
+  }
+}
+
+/**
+ * An memory manager which support allocate OFF_HEAP memory. It will not acquire memory from
+ * spark storage memory, and cacheGuardian is consumer of this class.
+ */
+private[filecache] class SelfManagedMemoryManager(sparkEnv: SparkEnv)
+  extends MemoryManager with Logging {
+
+  val cacheGuardianMemorySizeStr =
+    sparkEnv.conf.get(OapConf.OAP_CACHE_GUARDIAN_MEMORY_SIZE)
+  val cacheGuardianMemory = Utils.byteStringAsBytes(cacheGuardianMemorySizeStr)
+  logInfo(s"cacheGuardian total use $cacheGuardianMemory bytes memory")
+
+  private val _memoryUsed = new AtomicLong(0)
+  override def memoryUsed: Long = _memoryUsed.get()
+  override def memorySize: Long = cacheGuardianMemory
+
+  override private[filecache] def allocate(size: Long): MemoryBlockHolder = {
+    if (memoryUsed + size > cacheGuardianMemory) {
+      throw new OapException("cache guardian use too much memory")
+    }
+    val startTime = System.currentTimeMillis()
+    val occupiedSize = size
+    val address = Platform.allocateMemory(occupiedSize)
+    _memoryUsed.getAndAdd(occupiedSize)
+    logDebug(s"memory manager allocate takes" +
+      s" ${System.currentTimeMillis() - startTime} ms, " +
+      s"request allocate $size memory, actual occupied size: " +
+      s"${occupiedSize}, used: $memoryUsed")
+
+    MemoryBlockHolder(CacheEnum.GENERAL, null, address, size,
+      occupiedSize, "DRAM")
+  }
+
+  override private[filecache] def free(block: MemoryBlockHolder): Unit = {
+    val startTime = System.currentTimeMillis()
+    assert(block.baseObject == null)
+    Platform.freeMemory(block.baseOffset )
+    _memoryUsed.getAndAdd(-block.occupiedSize)
+    logDebug(s"memory manager free takes" +
+      s" ${System.currentTimeMillis() - startTime} ms" +
+      s"freed ${block.occupiedSize} memory, used: $memoryUsed")
   }
 }
 
@@ -219,11 +272,11 @@ private[filecache] class PersistentMemoryManager(sparkEnv: SparkEnv)
       _memoryUsed.getAndAdd(occupiedSize)
       logDebug(s"request allocate $size memory, actual occupied size: " +
         s"${occupiedSize}, used: $memoryUsed")
-      MemoryBlockHolder(null, address, size, occupiedSize)
+      MemoryBlockHolder(CacheEnum.GENERAL, null, address, size, occupiedSize, "PM")
     } catch {
       case e: OutOfMemoryError =>
         logWarning(e.getMessage)
-        MemoryBlockHolder(null, 0L, 0L, 0L)
+        MemoryBlockHolder(CacheEnum.GENERAL, null, 0L, 0L, 0L, "PM")
     }
   }
 

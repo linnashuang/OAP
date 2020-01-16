@@ -387,6 +387,13 @@ object OapConf {
       .stringConf
       .createWithDefault("")
 
+  val OAP_CACHE_GUARDIAN_MEMORY_SIZE =
+    SqlConfAdapter.buildConf("spark.sql.oap.cache.guardian.memory.size")
+      .internal()
+      .doc("total cache guardian memory size")
+      .stringConf
+      .createWithDefault("10g")
+
   val OAP_INDEX_STATISTIC_EXTERNALSORTER_ENABLE =
     SqlConfAdapter.buildConf("spark.sql.oap.index.statistic.externalsorter.enable")
       .internal()
