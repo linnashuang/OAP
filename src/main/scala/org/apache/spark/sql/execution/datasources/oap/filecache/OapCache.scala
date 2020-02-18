@@ -215,6 +215,7 @@ trait OapCache {
   def invalidateAll(fibers: Iterable[FiberId]): Unit
   def cacheSize: Long
   def cacheCount: Long
+  def dataCacheCount: Long
   def cacheStats: CacheStats
   def pendingFiberCount: Int
   def pendingFiberSize: Long
@@ -368,6 +369,8 @@ class SimpleOapCache extends OapCache with Logging {
   override def cacheStats: CacheStats = CacheStats()
 
   override def cacheCount: Long = 0
+
+  override def dataCacheCount: Long = 0
 
   override def pendingFiberCount: Int = cacheGuardian.pendingFiberCount
 
@@ -742,6 +745,14 @@ class GuavaOapCache(
       cacheInstance.size() + indexCacheInstance.size()
     } else {
       cacheInstance.size()
+    }
+
+  override def dataCacheCount: Long =
+    if (separationCache) {
+      cacheInstance.size()
+    } else {
+      cacheInstance.asMap().keySet().asScala
+        .count(fiber => fiber.isInstanceOf[DataFiberId] || fiber.isInstanceOf[TestDataFiberId])
     }
 
   override def pendingFiberCount: Int = cacheGuardian.pendingFiberCount
