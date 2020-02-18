@@ -55,6 +55,10 @@ You need to add -Ppersistent-memory to the build command line for building with 
 ```
 mvn clean -q -Ppersistent-memory -DskipTests package
 ```
+for vmemcache cache strategy, please build with command:
+```
+mvn clean -q -Pvmemcache -DskipTests package
+```
 
 ## Integration with Spark
 
