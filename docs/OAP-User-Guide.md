@@ -215,7 +215,7 @@ After the configuration, and you need to restart Spark Thrift Server to make the
 
 Another cache strategy named Non-evictable is also supported in OAP based on memkind library for DCPMM.
 
-To apply Non-evictable cache strategy in your workload. Please follow above prerequisites to set up DCPMM hardware and memkind library correctly. Then follow bellow configurations.
+To apply Non-evictable cache strategy in your workload. Please follow prerequisites to set up DCPMM hardware and memkind library correctly. Then follow bellow configurations.
 
 Enable OAP extension in spark-defaults.conf.
 
@@ -252,11 +252,9 @@ For Orc data format, provides following conf options:
 ### Use Vmemcache Cache
 Vmemcache cache strategy is implemented based on libvmemcache (buffer based LRU cache), which provides data store API using <key, value> as input.  Refer following steps to apply vmemcache cache strategy in your workload.
 
-Step 1. Install libvmemcache on each node.
+Step 1. Install libvmemcache on each node. Please refer [vmemcache](https://github.com/pmem/vmemcache).
         
-Refer https://github.com/pmem/vmemcache.
-
-Step 2. Configure DCPMM properly in AD mode
+Step 2. Please follow prerequisites to configure DCPMM hardware 
 
 Step 3. Configure properties to enable vmemcache support in OAP
 
