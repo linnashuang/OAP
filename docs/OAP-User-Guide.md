@@ -233,7 +233,6 @@ For Parquet data format, provides following conf options:
 --conf spark.sql.oap.fiberCache.persistent.memory.reserved.size=*g \
 --conf spark.memory.offHeap.size=*g  \
 --conf spark.sql.extensions=org.apache.spark.sql.OapExtensions \
---conf spark.sql.oap.fiberCache.persistent.memory.config.file=path/to/xml
 ```
 For Orc data format, provides following conf options:
 ```
@@ -246,7 +245,6 @@ For Orc data format, provides following conf options:
 --conf spark.sql.oap.fiberCache.persistent.memory.reserved.size=*g \
 --conf spark.memory.offHeap.size=*g  \
 --conf spark.sql.extensions=org.apache.spark.sql.OapExtensions \
---conf spark.sql.oap.fiberCache.persistent.memory.config.file=path/to/xml
 ```
 
 ### Use Vmemcache Cache
@@ -270,12 +268,11 @@ For Parquet data format, provides following conf options:
 ```
 --conf spark.sql.oap.parquet.enable=true \
 --conf spark.sql.oap.parquet.data.cache.enable=true \
---conf spark.sql.oap.fiberCache.memory.manager=self \
+--conf spark.sql.oap.fiberCache.memory.manager=tmp \
 --conf spark.oap.cache.strategy=vmem \
 --conf spark.sql.oap.fiberCache.persistent.memory.initial.size=*g \
 --conf spark.memory.offHeap.size=*g  \
 --conf spark.sql.extensions=org.apache.spark.sql.OapExtensions \
---conf spark.sql.oap.fiberCache.persistent.memory.config.file=path/to/xml
 ```
 
 For Orc data format, provides following conf options:
@@ -284,12 +281,11 @@ For Orc data format, provides following conf options:
 --conf spark.sql.oap.orc.enable=true \
 --conf spark.sql.orc.copyBatchToSpark=true \
 --conf spark.sql.oap.orc.data.cache.enable=true \
---conf spark.sql.oap.fiberCache.memory.manager=self \
+--conf spark.sql.oap.fiberCache.memory.manager=tmp \
 --conf spark.oap.cache.strategy=vmem \
 --conf spark.sql.oap.fiberCache.persistent.memory.initial.size=*g \
 --conf spark.memory.offHeap.size=*g  \
 --conf spark.sql.extensions=org.apache.spark.sql.OapExtensions \
---conf spark.sql.oap.fiberCache.persistent.memory.config.file=path/to/xml
 ```
 
 ## Run TPC-DS Benchmark for OAP Cache

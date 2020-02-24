@@ -103,7 +103,7 @@ private[sql] object MemoryManager {
       case "offheap" => new OffHeapMemoryManager(sparkEnv)
       case "pm" => new PersistentMemoryManager(sparkEnv)
       case "hybrid" => new HybridMemoryManager(sparkEnv)
-      case "self" => new SelfManagedMemoryManager(sparkEnv)
+      case "tmp" => new TmpDramMemoryManager(sparkEnv)
       case _ => throw new UnsupportedOperationException(
         s"The memory manager: ${memoryManagerOpt} is not supported now")
     }
@@ -172,7 +172,7 @@ private[filecache] class OffHeapMemoryManager(sparkEnv: SparkEnv)
  * An memory manager which support allocate OFF_HEAP memory. It will not acquire memory from
  * spark storage memory, and cacheGuardian is consumer of this class.
  */
-private[filecache] class SelfManagedMemoryManager(sparkEnv: SparkEnv)
+private[filecache] class TmpDramMemoryManager(sparkEnv: SparkEnv)
   extends MemoryManager with Logging {
 
   val cacheGuardianMemorySizeStr =
@@ -292,7 +292,7 @@ private[filecache] class PersistentMemoryManager(sparkEnv: SparkEnv)
 private[filecache] class HybridMemoryManager(sparkEnv: SparkEnv)
   extends MemoryManager with Logging {
   private val (persistentMemoryManager, dramMemoryManager) =
-    (new PersistentMemoryManager(sparkEnv), new SelfManagedMemoryManager(sparkEnv))
+    (new PersistentMemoryManager(sparkEnv), new TmpDramMemoryManager(sparkEnv))
 
   private val _memoryUsed = new AtomicLong(0)
 

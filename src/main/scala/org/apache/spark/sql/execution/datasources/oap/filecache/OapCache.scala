@@ -298,13 +298,11 @@ class NonEvictPMCache(pmSize: Long,
     if (cacheMap.contains(fiber)) {
       cacheMap.get(fiber)
     } else {
-      // throw new RuntimeException("Key not found")
       null
     }
   }
 
   override def getFibers: Set[FiberId] = {
-    // throw new RuntimeException("Unsupported")
     cacheMap.keySet().asScala.toSet
   }
 
@@ -486,7 +484,6 @@ class VMemCache extends OapCache with Logging {
         logDebug(s"$fiberKey is still stored.")
       }
     }
-    // logInfo(fiberSet.toString());
     fiberSet.toSet
   }
 
@@ -513,7 +510,6 @@ class VMemCache extends OapCache with Logging {
     logDebug(s"Current status is evict:$cacheEvictCount," +
       s" count:$cacheTotalCount, size:$cacheTotalSize")
     CacheStats(
-      // fiberSet.size, // dataFiberCount
       cacheTotalCount, // dataFiberCount
       cacheTotalSize, // dataFiberSize JNIGet
       0, // indexFiberCount
