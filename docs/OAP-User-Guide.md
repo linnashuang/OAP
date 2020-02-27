@@ -230,7 +230,6 @@ For Parquet data format, provides following conf options:
 --conf spark.sql.oap.fiberCache.memory.manager=hybrid \
 --conf spark.oap.cache.strategy=noevict \
 --conf spark.sql.oap.fiberCache.persistent.memory.initial.size=*g \
---conf spark.memory.offHeap.size=*g  \
 --conf spark.sql.extensions=org.apache.spark.sql.OapExtensions \
 ```
 For Orc data format, provides following conf options:
@@ -241,7 +240,6 @@ For Orc data format, provides following conf options:
 --conf spark.sql.oap.fiberCache.memory.manager=hybrid \
 --conf spark.oap.cache.strategy=noevict \
 --conf spark.sql.oap.fiberCache.persistent.memory.initial.size=*g \
---conf spark.memory.offHeap.size=*g  \
 --conf spark.sql.extensions=org.apache.spark.sql.OapExtensions \
 ```
 
@@ -269,7 +267,6 @@ For Parquet data format, provides following conf options:
 --conf spark.sql.oap.fiberCache.memory.manager=tmp \
 --conf spark.oap.cache.strategy=vmem \
 --conf spark.sql.oap.fiberCache.persistent.memory.initial.size=*g \
---conf spark.memory.offHeap.size=*g  \
 --conf spark.sql.extensions=org.apache.spark.sql.OapExtensions \
 ```
 
@@ -282,7 +279,6 @@ For Orc data format, provides following conf options:
 --conf spark.sql.oap.fiberCache.memory.manager=tmp \
 --conf spark.oap.cache.strategy=vmem \
 --conf spark.sql.oap.fiberCache.persistent.memory.initial.size=*g \
---conf spark.memory.offHeap.size=*g  \
 --conf spark.sql.extensions=org.apache.spark.sql.OapExtensions \
 ```
 
