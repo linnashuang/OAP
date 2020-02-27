@@ -52,7 +52,7 @@ You  need to install the required packages on the build system listed below.
 
 
 ##### Building package
-You need to add -Ppersistent-memory to the build command line for building with DCPMM support.
+You need to add -Ppersistent-memory to the build command line for building with DCPMM support. For Non-evictable cache stratege, you need to build with -Ppersistent-memory also.
 ```
 mvn clean -q -Ppersistent-memory -DskipTests package
 ```
