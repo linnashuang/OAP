@@ -281,6 +281,7 @@ For Orc data format, provides following conf options:
 --conf spark.sql.oap.fiberCache.persistent.memory.initial.size=*g \
 --conf spark.sql.extensions=org.apache.spark.sql.OapExtensions \
 ```
+Note: If "PendingFiber Size" (on spark web-UI OAP page) is large, or some tasks failed due to "cache guardian use too much memory", user could set spark.sql.oap.cache.guardian.memory.size config to a larger number, which default size is 10GB. Besides, user could increase spark.sql.oap.cache.guardian.free.thread.nums or decrease spark.sql.oap.cache.dispose.timeout.ms to accelerate memory free.
 
 ## Run TPC-DS Benchmark for OAP Cache
 
